@@ -11,7 +11,7 @@ class MQTTClient:
         self.user_id = user_id
         self.broker_host = broker_host
         self.broker_port = broker_port
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv5, client_id=user_id)
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=user_id, clean_session=False)
 
         # Topic definitions
         self.control_topic = f"{user_id}_Control"
@@ -39,9 +39,9 @@ class MQTTClient:
     
     def _on_connect(self, client, userdata, flags, rc, props):
         if rc == 0:
-            self.client.subscribe(self.control_topic)
-            self.client.subscribe(self.users_topic)
-            self.client.subscribe(self.groups_topic)
+            self.client.subscribe(self.control_topic, qos=1)
+            self.client.subscribe(self.users_topic, qos=1)
+            self.client.subscribe(self.groups_topic, qos=1)
             
             self._announce_online()
             
@@ -119,7 +119,7 @@ class MQTTClient:
             "timestamp": datetime.now().isoformat()
         })
         
-        self.client.subscribe(chat_topic)
+        self.client.subscribe(chat_topic, qos=1)
         self.active_sessions[session_id] = chat_topic
         
         print(f"\n\nChat accepted! Topic: {chat_topic}")
@@ -177,9 +177,7 @@ class MQTTClient:
     
     def connect(self):
         try:
-            properties=mqtt.Properties(mqtt.PacketTypes.CONNECT)
-            properties.SessionExpiryInterval=240
-            self.client.connect_async(self.broker_host, self.broker_port, clean_start=True, properties=properties, keepalive=60)
+            self.client.connect_async(self.broker_host, self.broker_port, keepalive=60)
             self.client.loop_start()
             return True
         except Exception as e:
@@ -187,9 +185,9 @@ class MQTTClient:
             return False
     
     def disconnect(self):
-        self._store_subscribed_topics()
         self._announce_offline()
         self.client.loop_stop()
+        self._store_subscribed_topics()
         self.client.disconnect()
     
     def _announce_online(self):
@@ -199,7 +197,7 @@ class MQTTClient:
             "status": "online",
             "timestamp": datetime.now().isoformat()
         }
-        self.client.publish(self.users_topic, json.dumps(message))
+        self.client.publish(self.users_topic, json.dumps(message), qos=1)
     
     def _announce_offline(self):
         message = {
@@ -208,14 +206,14 @@ class MQTTClient:
             "status": "offline",
             "timestamp": datetime.now().isoformat()
         }
-        self.client.publish(self.users_topic, json.dumps(message))
+        self.client.publish(self.users_topic, json.dumps(message), qos=1)
     
     def _request_users_list(self):
         message = {
             "type": "request_users_list",
             "from": self.user_id
         }
-        self.client.publish(self.users_topic, json.dumps(message))
+        self.client.publish(self.users_topic, json.dumps(message), qos=1)
         time.sleep(1)
     
     def _request_groups_list(self):
@@ -223,7 +221,7 @@ class MQTTClient:
             "type": "request_groups_list",
             "from": self.user_id
         }
-        self.client.publish(self.groups_topic, json.dumps(message))
+        self.client.publish(self.groups_topic, json.dumps(message), qos=1)
     
     def request_chat(self, target_user: str) -> str:
         session_id = f"{self.user_id}_{target_user}_{int(time.time())}"
@@ -236,7 +234,7 @@ class MQTTClient:
         }
         
         target_control_topic = f"{target_user}_Control"
-        self.client.publish(target_control_topic, json.dumps(message))
+        self.client.publish(target_control_topic, json.dumps(message), qos=1)
 
         print(f"\nRequest sent to user {target_user}")
         print(f"Session ID: {session_id}")
@@ -255,7 +253,7 @@ class MQTTClient:
             return
         
         chat_topic = session_id
-        self.client.subscribe(chat_topic)
+        self.client.subscribe(chat_topic, qos=1)
         self.active_sessions[session_id] = chat_topic
         
         from_user = request["from"]
@@ -267,7 +265,7 @@ class MQTTClient:
         }
         
         target_control_topic = f"{from_user}_Control"
-        self.client.publish(target_control_topic, json.dumps(message))
+        self.client.publish(target_control_topic, json.dumps(message), qos=1)
         
         self.pending_requests.remove(request)
         
@@ -293,7 +291,7 @@ class MQTTClient:
         }
         
         target_control_topic = f"{from_user}_Control"
-        self.client.publish(target_control_topic, json.dumps(message))
+        self.client.publish(target_control_topic, json.dumps(message), qos=1)
         
         self.pending_requests.remove(request)
         
@@ -312,7 +310,7 @@ class MQTTClient:
             "timestamp": datetime.now().isoformat()
         }
         
-        self.client.publish(chat_topic, json.dumps(data))
+        self.client.publish(chat_topic, json.dumps(data), qos=1)
     
     def create_group(self, group_name: str):
         group_info = {
@@ -328,11 +326,11 @@ class MQTTClient:
             "group_info": group_info
         }
         
-        self.client.publish(self.groups_topic, json.dumps(message))
+        self.client.publish(self.groups_topic, json.dumps(message), qos=1)
         self.groups[group_name] = group_info
         
         group_topic = f"GROUP_{group_name}"
-        self.client.subscribe(group_topic)
+        self.client.subscribe(group_topic, qos=1)
         
         print(f"Group '{group_name}' created successfully!")
     
@@ -375,7 +373,7 @@ class MQTTClient:
                 "group_info": group_info
             }
             
-            self.client.publish(self.groups_topic, json.dumps(message))
+            self.client.publish(self.groups_topic, json.dumps(message), qos=1)
             self.groups[group_name] = group_info
             
             accept_message = {
@@ -408,7 +406,7 @@ class MQTTClient:
             "timestamp": datetime.now().isoformat()
         }
         
-        self.client.publish(group_topic, json.dumps(data))
+        self.client.publish(group_topic, json.dumps(data), qos=1)
         print(f"Message sent to group '{group_name}': {message}")
     
     def get_online_users(self) -> Dict[str, str]:
@@ -453,7 +451,7 @@ class MQTTClient:
                 "timestamp": datetime.now().isoformat()
             }
             
-            self.client.publish(self.control_topic, json.dumps(message), retain=True)
+            self.client.publish(self.control_topic, json.dumps(message), qos=1)
             print(f"Stored {len(subscribed_topics)} subscribed topics")
     
     def _handle_subscribed_topics(self, data):
@@ -471,7 +469,7 @@ class MQTTClient:
                 session_id = topic_info.get("session_id")
                 topic = topic_info.get("topic")
                 if session_id and topic:
-                    self.client.subscribe(topic)
+                    self.client.subscribe(topic, qos=1)
                     self.active_sessions[session_id] = topic
                     print(f"Resubscribed to chat: {session_id}")
             
@@ -479,5 +477,5 @@ class MQTTClient:
                 group_name = topic_info.get("group_name")
                 topic = topic_info.get("topic")
                 if group_name and topic:
-                    self.client.subscribe(topic)
+                    self.client.subscribe(topic, qos=1)
                     print(f"Resubscribed to group: {group_name}")
