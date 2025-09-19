@@ -92,6 +92,8 @@ class MQTTClient:
             self._handle_group_accept(data)
         elif message_type == "group_reject":
             self._handle_group_reject(data)
+        elif message_type == "subscribed_topics":
+            self._handle_subscribed_topics(data)
     
     def _handle_chat_request(self, data):
         from_user = data.get("from")
@@ -185,6 +187,7 @@ class MQTTClient:
             return False
     
     def disconnect(self):
+        self._store_subscribed_topics()
         self._announce_offline()
         self.client.loop_stop()
         self.client.disconnect()
@@ -422,3 +425,59 @@ class MQTTClient:
     
     def get_active_sessions(self) -> Dict[str, str]:
         return self.active_sessions.copy()
+    
+    def _store_subscribed_topics(self):
+        subscribed_topics = []
+        
+        # Add active chat sessions
+        for session_id, topic in self.active_sessions.items():
+            subscribed_topics.append({
+                "type": "chat",
+                "session_id": session_id,
+                "topic": topic
+            })
+        
+        # Add group subscriptions
+        for group_name, group_info in self.groups.items():
+            if self.user_id in group_info.get("members", []):
+                subscribed_topics.append({
+                    "type": "group",
+                    "group_name": group_name,
+                    "topic": f"GROUP_{group_name}"
+                })
+        
+        if subscribed_topics:
+            message = {
+                "type": "subscribed_topics",
+                "topics": subscribed_topics,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            self.client.publish(self.control_topic, json.dumps(message), retain=True)
+            print(f"Stored {len(subscribed_topics)} subscribed topics")
+    
+    def _handle_subscribed_topics(self, data):
+        topics = data.get("topics", [])
+        
+        if not topics:
+            return
+        
+        print(f"\nLoading {len(topics)} previously subscribed topics...")
+        
+        for topic_info in topics:
+            topic_type = topic_info.get("type")
+            
+            if topic_type == "chat":
+                session_id = topic_info.get("session_id")
+                topic = topic_info.get("topic")
+                if session_id and topic:
+                    self.client.subscribe(topic)
+                    self.active_sessions[session_id] = topic
+                    print(f"Resubscribed to chat: {session_id}")
+            
+            elif topic_type == "group":
+                group_name = topic_info.get("group_name")
+                topic = topic_info.get("topic")
+                if group_name and topic:
+                    self.client.subscribe(topic)
+                    print(f"Resubscribed to group: {group_name}")
