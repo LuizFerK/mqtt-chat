@@ -128,6 +128,47 @@ class MQTTClient:
         session_id = data.get("session_id")
         print(f"\nChat rejected for session: {session_id}")
     
+    def _handle_group_request(self, data):
+        from_user = data.get("from")
+        group_name = data.get("group_name")
+        session_id = data.get("session_id")
+        
+        request = {
+            "from": from_user,
+            "group_name": group_name,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        self.pending_requests.append(request)
+        print(f"\n\nNew group request from user {from_user}")
+        print(f"Group: {group_name}")
+        print(f"Session ID: {session_id}\n")
+    
+    def _handle_group_accept(self, data):
+        session_id = data.get("session_id")
+        group_topic = data.get("group_topic")
+        group_name = data.get("group_name")
+        
+        self.accepted_requests.append({
+            "session_id": session_id,
+            "group_topic": group_topic,
+            "group_name": group_name,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        self.client.subscribe(group_topic, qos=1)
+        self.active_sessions[session_id] = group_topic
+        
+        print(f"\n\nGroup request accepted! Topic: {group_topic}")
+        print(f"Group: {group_name}")
+    
+    def _handle_group_reject(self, data):
+        session_id = data.get("session_id")
+        group_name = data.get("group_name")
+        print(f"\nGroup request rejected for session: {session_id}")
+        print(f"Group: {group_name}")
+    
     def _handle_users_message(self, data):
         message_type = data.get("type")
         
@@ -376,9 +417,11 @@ class MQTTClient:
             self.client.publish(self.groups_topic, json.dumps(message), qos=1)
             self.groups[group_name] = group_info
             
+            group_topic = f"GROUP_{group_name}"
             accept_message = {
                 "type": "group_accept",
                 "group_name": group_name,
+                "group_topic": group_topic,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -386,6 +429,27 @@ class MQTTClient:
             self.client.publish(user_control_topic, json.dumps(accept_message))
             
             print(f"{user_id} added to group '{group_name}'")
+    
+    def reject_group_request(self, group_name: str, user_id: str):
+        if group_name not in self.groups:
+            print("Group not found")
+            return
+        
+        group_info = self.groups[group_name]
+        if group_info["leader"] != self.user_id:
+            print("Only the leader can reject requests")
+            return
+        
+        reject_message = {
+            "type": "group_reject",
+            "group_name": group_name,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        user_control_topic = f"{user_id}_Control"
+        self.client.publish(user_control_topic, json.dumps(reject_message))
+        
+        print(f"Rejected {user_id} from group '{group_name}'")
     
     def send_group_message(self, group_name: str, message: str):
         if group_name not in self.groups:

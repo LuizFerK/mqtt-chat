@@ -31,8 +31,9 @@ class ChatUI:
         print("1. List groups")
         print("2. Create new group")
         print("3. Request group join")
-        print("4. Group chat")
-        print("5. Back to menu")
+        print("4. Manage group requests")
+        print("5. Group chat")
+        print("6. Back to menu")
     
     def get_user_input(self, prompt: str) -> str:
         return input(f"{prompt}: ").strip()
@@ -228,14 +229,26 @@ class ChatUI:
             self.wait_for_enter()
             return
         
+        # Filter out groups where user is already a member
+        available_groups = []
+        for group_name, group_info in groups.items():
+            if (self.mqtt_client.user_id not in group_info["members"] and 
+                group_info["leader"] != self.mqtt_client.user_id):
+                available_groups.append(group_name)
+        
+        if not available_groups:
+            print("No groups available to join (you are already a member of all groups)")
+            self.wait_for_enter()
+            return
+        
         print("Available groups:")
-        for i, group_name in enumerate(groups.keys(), 1):
+        for i, group_name in enumerate(available_groups, 1):
             print(f"{i}. {group_name}")
         
         try:
             choice = int(self.get_user_input("Choose group number"))
-            if 1 <= choice <= len(groups):
-                group_name = list(groups.keys())[choice - 1]
+            if 1 <= choice <= len(available_groups):
+                group_name = available_groups[choice - 1]
                 self.mqtt_client.join_group(group_name)
             else:
                 print("Invalid option")
@@ -243,6 +256,101 @@ class ChatUI:
             print("Please enter a valid number")
         
         self.wait_for_enter()
+    
+    def manage_group_requests(self):
+        self.clear_screen()
+        self.print_header()
+        
+        print("\nManage group requests:")
+        
+        # Get groups where current user is the leader
+        groups = self.mqtt_client.get_groups()
+        leader_groups = []
+        
+        for group_name, group_info in groups.items():
+            if group_info['leader'] == self.mqtt_client.user_id:
+                leader_groups.append(group_name)
+        
+        if not leader_groups:
+            print("You are not a leader of any group")
+            self.wait_for_enter()
+            return
+        
+        print("Your groups (as leader):")
+        for i, group_name in enumerate(leader_groups, 1):
+            print(f"{i}. {group_name}")
+        
+        try:
+            choice = int(self.get_user_input("Choose group number (0 to go back)"))
+            if choice == 0:
+                return
+            elif 1 <= choice <= len(leader_groups):
+                group_name = leader_groups[choice - 1]
+                self._handle_group_requests_for_group(group_name)
+            else:
+                print("Invalid option")
+        except ValueError:
+            print("Please enter a valid number")
+        
+        self.wait_for_enter()
+    
+    def _handle_group_requests_for_group(self, group_name: str):
+        self.clear_screen()
+        self.print_header()
+        
+        print(f"\nGroup requests for '{group_name}':")
+        
+        # Get pending requests for this group
+        group_requests = []
+        for request in self.mqtt_client.pending_requests:
+            if (request.get('group_name') == group_name and 
+                request.get('from') != self.mqtt_client.user_id):
+                group_requests.append(request)
+        
+        if not group_requests:
+            print("No pending requests for this group")
+            self.wait_for_enter()
+            return
+        
+        print("Pending requests:")
+        for i, request in enumerate(group_requests, 1):
+            print(f"{i}. {request['from']} - {request['timestamp']}")
+        
+        try:
+            choice = int(self.get_user_input("Choose request number (0 to go back)"))
+            if choice == 0:
+                return
+            elif 1 <= choice <= len(group_requests):
+                request = group_requests[choice - 1]
+                self._process_group_request(group_name, request)
+            else:
+                print("Invalid option")
+        except ValueError:
+            print("Please enter a valid number")
+    
+    def _process_group_request(self, group_name: str, request: dict):
+        from_user = request['from']
+        
+        print(f"\nRequest from: {from_user}")
+        print(f"Group: {group_name}")
+        
+        action = self.get_user_input("Accept? (y/n)")
+        if action.lower() in ['y', 'yes']:
+            self.mqtt_client.accept_group_request(group_name, from_user)
+            # Remove from pending requests
+            self.mqtt_client.pending_requests = [
+                req for req in self.mqtt_client.pending_requests 
+                if not (req.get('from') == from_user and req.get('group_name') == group_name)
+            ]
+            print(f"Accepted {from_user} into group '{group_name}'")
+        else:
+            self.mqtt_client.reject_group_request(group_name, from_user)
+            # Remove from pending requests
+            self.mqtt_client.pending_requests = [
+                req for req in self.mqtt_client.pending_requests 
+                if not (req.get('from') == from_user and req.get('group_name') == group_name)
+            ]
+            print(f"Rejected {from_user} from group '{group_name}'")
     
     def group_chat(self):
         self.clear_screen()
@@ -392,8 +500,10 @@ class ChatUI:
                 elif choice == 3:
                     self.join_group()
                 elif choice == 4:
-                    self.group_chat()
+                    self.manage_group_requests()
                 elif choice == 5:
+                    self.group_chat()
+                elif choice == 6:
                     break
                 else:
                     print("Invalid option")
