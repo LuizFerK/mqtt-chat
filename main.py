@@ -3,14 +3,17 @@
 import os
 import sys
 import time
-from mqtt_client import MQTTClient
-from chat_ui import ChatUI
+from src.core.mqtt_client import MQTTClient
+from src.ui.chat_ui import ChatUI
+from src.utils.helpers import validate_user_id
 
 
 def main():
+    """Main application entry point."""
     os.system('clear' if os.name == 'posix' else 'cls')
     print("Starting MQTT Chat...")
     
+    # Get user ID
     if len(sys.argv) > 1:
         user_id = sys.argv[1]
     else:
@@ -19,6 +22,12 @@ def main():
             print("User ID cannot be empty")
             return
     
+    # Validate user ID
+    if not validate_user_id(user_id):
+        print("Invalid user ID. Please use only letters, numbers, and underscores.")
+        return
+    
+    # Get broker configuration
     broker_host = input("Broker host (localhost): ").strip() or "localhost"
     broker_port = input("Broker port (1883): ").strip() or "1883"
     
@@ -30,6 +39,7 @@ def main():
     
     print(f"\nConnecting to broker {broker_host}:{broker_port}...")
     
+    # Initialize MQTT client
     mqtt_client = MQTTClient(user_id, broker_host, broker_port)
     
     if not mqtt_client.connect():
@@ -38,6 +48,7 @@ def main():
         print("   docker-compose up -d")
         return
     
+    # Initialize and run UI
     ui = ChatUI(mqtt_client)
     
     try:
