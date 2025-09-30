@@ -9,7 +9,6 @@ A chat application based on the MQTT protocol developed in Python.
 - **Status management**: Online/offline users
 - **Control system**: Control topics for each user
 - **Session negotiation**: Chat request/acceptance system
-- **User-friendly interface**: Text menu with all options
 
 ## Architecture
 
@@ -84,31 +83,16 @@ nix run .#logs                # View broker logs
 nix run .#status              # View broker status
 
 # Development
-nix run .#install-deps        # Check dependencies (managed by Nix)
 nix run .#run-app             # Run application
 nix run .#start-all           # Start everything (broker + app)
 nix run .#cleanup             # Clean containers and volumes
 ```
 
-### Development Environment
-
-To enter the development environment with all available tools:
-
-```bash
-nix develop
-```
-
-This provides:
-- Python 3.11
-- paho-mqtt (MQTT library)
-- Docker and Docker Compose
-- All necessary tools
-
 ## How to Use
 
 ### Starting the Application
 
-1. Run `python main.py`
+1. Run `nix run .#run-app` (Nix) or `python main.py` (manual)
 2. Enter your user ID (must be unique)
 3. Configure the broker host and port (default: localhost:1883)
 
@@ -136,7 +120,8 @@ The application offers an interactive menu with the following options:
 
 1. **Creation**: User creates group and becomes leader
 2. **Join request**: Other users request participation
-3. **Approval**: Leader approves or rejects requests
+3. **Notification**: Leader receives notification on topic `{ID}_Control`
+3. **Acceptance/Rejection**: Leader approves or rejects requests
 4. **Group chat**: Members can exchange messages on topic `GROUP_{name}`
 
 ## Configuration
@@ -157,14 +142,18 @@ The `docker-compose.yml` file configures:
 ```
 mqtt-chat/
 ├── main.py              # Main application
-├── mqtt_client.py       # MQTT client and business logic
-├── chat_ui.py          # User interface
+├── src/                 # Source code directory
+│   ├── client.py        # MQTT client and business logic
+│   ├── ui.py            # User interface
+│   ├── models.py        # Data models
+│   ├── helpers.py       # Helper functions
+│   └── chat_helpers.py  # Chat-specific helper functions
 ├── requirements.txt     # Python dependencies
 ├── docker-compose.yml   # Broker configuration
-├── mosquitto.conf      # Mosquitto configuration
-├── flake.nix           # Nix flake for management
-├── description.txt     # Project specification
-└── README.md           # This file
+├── mosquitto.conf       # Mosquitto configuration
+├── flake.nix            # Nix flake for management
+├── flake.lock           # Nix flake lock file
+└── README.md            # This file
 ```
 
 ## Debugging
@@ -175,12 +164,6 @@ The application includes a debug menu that shows:
 - Accepted requests
 - Active sessions
 - Detailed group information
-
-## Security
-
-- **Anonymous connections**: Enabled for simplicity (not recommended for production)
-- **Unique IDs**: Each user must have a unique ID
-- **Validation**: Application validates user input
 
 ## Limitations
 
@@ -215,17 +198,3 @@ python main.py bob
 # Bob accepts the request
 # Both can exchange messages
 ```
-
-## Contributing
-
-This is an academic project developed according to specification. For improvements:
-
-1. Fork the project
-2. Create a branch for your feature
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## License
-
-This project is developed for academic purposes.
