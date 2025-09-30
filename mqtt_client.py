@@ -200,6 +200,16 @@ class MQTTClient:
         elif message_type == "groups_list":
             groups = data.get("groups", {})
             self.groups.update(groups)
+        elif message_type == "request_groups_list":
+            requesting_user = data.get("from")
+            if requesting_user != self.user_id and self.groups:
+                # Respond with our groups
+                response = {
+                    "type": "groups_list",
+                    "groups": self.groups,
+                    "timestamp": datetime.now().isoformat()
+                }
+                self.client.publish(self.groups_topic, json.dumps(response), qos=1)
     
     def _handle_chat_message(self, topic, data):
         from_user = data.get("from")
@@ -214,7 +224,7 @@ class MQTTClient:
         group_name = data.get("group_name")
         timestamp = data.get("timestamp", datetime.now().isoformat())
         
-        print(f"\n[{timestamp}] {group_name} - {from_user}: {message}")
+        print(f"[{timestamp}] {group_name} - {from_user}: {message}")
     
     def connect(self):
         try:
@@ -263,6 +273,7 @@ class MQTTClient:
             "from": self.user_id
         }
         self.client.publish(self.groups_topic, json.dumps(message), qos=1)
+        time.sleep(1)
     
     def request_chat(self, target_user: str) -> str:
         session_id = f"{self.user_id}_{target_user}_{int(time.time())}"
@@ -471,10 +482,9 @@ class MQTTClient:
         }
         
         self.client.publish(group_topic, json.dumps(data), qos=1)
-        print(f"Message sent to group '{group_name}': {message}")
     
     def get_online_users(self) -> Dict[str, str]:
-        return {user: status for user, status in self.online_users.items() if status == "online"}
+        return {user: status for user, status in self.online_users.items()}
     
     def get_pending_requests(self) -> List[Dict]:
         return self.pending_requests.copy()
@@ -542,4 +552,5 @@ class MQTTClient:
                 topic = topic_info.get("topic")
                 if group_name and topic:
                     self.client.subscribe(topic, qos=1)
+                    self.groups[group_name] = topic
                     print(f"Resubscribed to group: {group_name}")
