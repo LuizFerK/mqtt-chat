@@ -116,7 +116,7 @@ This provides:
 
 The application offers an interactive menu with the following options:
 
-1. **List online users**: View all connected users
+1. **List users**: View all users
 2. **Request chat**: Start a chat with another user
 3. **Manage requests**: Accept/reject chat requests
 4. **Active chat**: Access ongoing conversations
