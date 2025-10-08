@@ -145,7 +145,6 @@ mqtt-chat/
 ├── src/                 # Source code directory
 │   ├── client.py        # MQTT client and business logic
 │   ├── ui.py            # User interface
-│   ├── models.py        # Data models
 │   ├── helpers.py       # Helper functions
 │   └── chat_helpers.py  # Chat-specific helper functions
 ├── requirements.txt     # Python dependencies

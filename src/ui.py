@@ -1,6 +1,3 @@
-import os
-import sys
-from typing import Dict, List
 from src.client import MQTTClient
 from src.helpers import clear_screen, get_user_input, wait_for_enter
 from src.chat_helpers import (
