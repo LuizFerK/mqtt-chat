@@ -45,22 +45,21 @@ class ChatUI:
     
     print("\nRequest chat:")
     
-    users = self.mqtt_client.get_users()
-    available_users = [user for user in users.keys() if user != self.mqtt_client.user_id]
+    users = list(self.mqtt_client.get_users().keys())
     
-    if not available_users:
+    if not users:
       print("No online users available for chat")
       self.wait_for_enter()
       return
-    
-    print_available_users(available_users)
+
+    print_available_users(users)
     
     try:
       choice = int(self.get_user_input("\nChoose user number (0 to cancel)"))
       if choice == 0:
         return
-      elif 1 <= choice <= len(available_users):
-        target_user = available_users[choice - 1]
+      elif 1 <= choice <= len(users):
+        target_user = users[choice - 1]
         session_id = self.mqtt_client.request_chat(target_user)
       else:
         print("Invalid option")
@@ -73,7 +72,7 @@ class ChatUI:
     self.clear_screen()
     self.print_header()
     
-    pending_requests = self.mqtt_client.get_pending_requests()
+    pending_requests = self.mqtt_client.get_pending_chat_requests()
     
     if not pending_requests:
       print("No pending requests")
@@ -260,7 +259,7 @@ class ChatUI:
     print(f"\nGroup requests for '{group_name}':")
     
     group_requests = []
-    for request in self.mqtt_client.pending_requests:
+    for request in self.mqtt_client.get_pending_group_requests():
       if (request.get('group_name') == group_name and 
           request.get('from') != self.mqtt_client.user_id):
         group_requests.append(request)

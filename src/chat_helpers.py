@@ -29,7 +29,7 @@ def print_groups_menu():
 
 def print_users(users: Dict[str, str], current_user: str):
   print("\nUsers:")
-  
+
   if not users:
     print("No users found")
   else:
@@ -89,11 +89,19 @@ def print_debug_info(mqtt_client):
   for user, status in mqtt_client.users.items():
     print(f"  {user}: {status}")
   
-  print("\nPending requests:")
-  pending = mqtt_client.get_pending_requests()
+  print("\nPending chat requests:")
+  pending = mqtt_client.get_pending_chat_requests()
   if pending:
     for req in pending:
       print(f"  From: {req['from']} - Session: {req['session_id']}")
+  else:
+    print("  No pending requests")
+
+  print("\nPending group requests:")
+  pending = mqtt_client.get_pending_group_requests()
+  if pending:
+    for req in pending:
+      print(f"  From: {req['from']} - Group: {req['group_name']}")
   else:
     print("  No pending requests")
   
@@ -101,7 +109,10 @@ def print_debug_info(mqtt_client):
   accepted = mqtt_client.get_accepted_requests()
   if accepted:
     for req in accepted:
-      print(f"  Session: {req['session_id']} - Topic: {req['chat_topic']}")
+      if "group_name" in req:
+        print(f"  Session: {req['group_topic']} - Group: {req['group_name']}")
+      else:
+        print(f"  Session: {req['session_id']} - Topic: {req['chat_topic']}")
   else:
     print("  No accepted requests")
   

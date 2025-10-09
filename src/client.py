@@ -171,9 +171,6 @@ class MQTTClient:
       user_id = data.get("user_id")
       status = data.get("status")
       self.users[user_id] = status
-    elif message_type == "users_list":
-      users = data.get("users", {})
-      self.users.update(users)
     elif message_type == "request_users_list":
       requesting_user = data.get("from")
       if requesting_user != self.user_id:
@@ -490,10 +487,13 @@ class MQTTClient:
     self.client.publish(group_topic, json.dumps(data), qos=1)
   
   def get_users(self) -> Dict[str, str]:
-    return {user: status for user, status in self.users.items()}
+    return {user: status for user, status in self.users.items() if user != self.user_id}
   
-  def get_pending_requests(self) -> List[Dict]:
-    return self.pending_requests.copy()
+  def get_pending_chat_requests(self) -> List[Dict]:
+    return [req for req in self.pending_requests if not req.get("group_name")]
+
+  def get_pending_group_requests(self) -> List[Dict]:
+    return [req for req in self.pending_requests if req.get("group_name")]
   
   def get_accepted_requests(self) -> List[Dict]:
     return self.accepted_requests.copy()
