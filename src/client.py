@@ -126,42 +126,36 @@ class MQTTClient:
   def _handle_group_request(self, data):
     from_user = data.get("from")
     group_name = data.get("group_name")
-    session_id = data.get("session_id")
     
     request = {
       "from": from_user,
       "group_name": group_name,
-      "session_id": session_id,
       "timestamp": datetime.now().isoformat()
     }
     
     self.pending_requests.append(request)
     print(f"\nNew group request from user {from_user}")
     print(f"Group: {group_name}")
-    print(f"Session ID: {session_id}\n")
   
   def _handle_group_accept(self, data):
-    session_id = data.get("session_id")
     group_topic = data.get("group_topic")
     group_name = data.get("group_name")
     
     self.accepted_requests.append({
-      "session_id": session_id,
       "group_topic": group_topic,
       "group_name": group_name,
       "timestamp": datetime.now().isoformat()
     })
     
     self.client.subscribe(group_topic, qos=1)
-    self.active_sessions[session_id] = group_topic
+    self.active_sessions[group_name] = group_topic
     
     print(f"\n\nGroup request accepted! Topic: {group_topic}")
     print(f"Group: {group_name}")
   
   def _handle_group_reject(self, data):
-    session_id = data.get("session_id")
     group_name = data.get("group_name")
-    print(f"\nGroup request rejected for session: {session_id}")
+    print(f"\nGroup request rejected")
     print(f"Group: {group_name}")
   
   def _handle_users_message(self, data):
@@ -435,6 +429,7 @@ class MQTTClient:
       
       user_control_topic = f"{user_id}_Control"
       self.client.publish(user_control_topic, json.dumps(accept_message))
+      self.active_sessions[group_name] = group_topic
       
       print(f"{user_id} added to group '{group_name}'")
   
@@ -459,8 +454,6 @@ class MQTTClient:
     
     user_control_topic = f"{user_id}_Control"
     self.client.publish(user_control_topic, json.dumps(reject_message))
-    
-    print(f"Rejected {user_id} from group '{group_name}'")
   
   def send_group_message(self, group_name: str, message: str):
     if group_name not in self.groups:
@@ -538,7 +531,6 @@ class MQTTClient:
           "type": "group_request",
           "from": request["from"],
           "group_name": request["group_name"],
-          "session_id": request["session_id"],
           "timestamp": request["timestamp"]
         })
     
@@ -546,7 +538,6 @@ class MQTTClient:
       if "group_name" in request:
         state.append({
           "type": "accepted_group_request",
-          "session_id": request["session_id"],
           "group_topic": request["group_topic"],
           "group_name": request["group_name"],
           "timestamp": request["timestamp"]
@@ -610,7 +601,6 @@ class MQTTClient:
         request = {
           "from": topic_info.get("from"),
           "group_name": topic_info.get("group_name"),
-          "session_id": topic_info.get("session_id"),
           "timestamp": topic_info.get("timestamp")
         }
         self.pending_requests.append(request)
@@ -627,10 +617,9 @@ class MQTTClient:
       
       elif topic_type == "accepted_group_request":
         request = {
-          "session_id": topic_info.get("session_id"),
           "group_topic": topic_info.get("group_topic"),
           "group_name": topic_info.get("group_name"),
           "timestamp": topic_info.get("timestamp")
         }
         self.accepted_requests.append(request)
-        print(f"Restored accepted group request: {request['session_id']} for group: {request['group_name']}")
+        print(f"Restored accepted group request: {request['group_topic']} for group: {request['group_name']}")

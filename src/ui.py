@@ -158,10 +158,14 @@ class ChatUI:
     
     print("\nCreate new group:")
     
-    group_name = self.get_user_input("Group name")
+    group_name = self.get_user_input("Group name (0 to cancel)")
     
     if not group_name:
       print("Group name cannot be empty")
+      self.wait_for_enter()
+      return
+
+    if group_name == "0":
       self.wait_for_enter()
       return
     
